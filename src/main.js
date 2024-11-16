@@ -1,5 +1,5 @@
 const GRID_SIZE = 32;
-const UPDATE_INTERVAL = 50; // Update every 200ms (5 times/sec)
+const UPDATE_INTERVAL = 1000; // Update every 200ms (5 times/sec)
 const WORKGROUP_SIZE = 8;
 let step = 0; // Track how many simulation steps have been run
 
@@ -231,11 +231,14 @@ const cellStateStorage = [
 // }
 for (let i = 0; i < cellStateArray.length; i++) {
     // cellStateArray[i] = i % 2 ? 0 : 1;
-    cellStateArray[i] = Math.random() > 0.9 ? 1 : 0;
+    // cellStateArray[i] = Math.random() > 0.6 ? 1 : 0;
 }
 // cellStateArray[cellStateArray.length - 9] = 1;
+// cellStateArray[cellStateArray.length - 10] = 1;
+// cellStateArray[cellStateArray.length - 11] = 1;
 // cellStateArray[cellStateArray.length - 105] = 1;
-// cellStateArray[cellStateArray.length - 105 - 32 * 2] = 1;
+// cellStateArray[cellStateArray.length - 106] = 1;
+cellStateArray[cellStateArray.length - 202] = 1;
 
 // cellStateArray[cellStateArray.length - GRID_SIZE / 2] = 1;
 device.queue.writeBuffer(cellStateStorage[0], 0, cellStateArray);
