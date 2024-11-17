@@ -1,5 +1,5 @@
-const GRID_SIZE = 32;
-const UPDATE_INTERVAL = 1000; // Update every 200ms (5 times/sec)
+const GRID_SIZE = 64;
+const UPDATE_INTERVAL = 50; // Update every 200ms (5 times/sec)
 const WORKGROUP_SIZE = 8;
 let step = 0; // Track how many simulation steps have been run
 
@@ -9,18 +9,25 @@ function updateGrid() {
     // which are used to submit work to the GPU
     const encoder = device.createCommandEncoder();
 
+    // ---- Step 1: Compute pass for simulation ----
     const computePass = encoder.beginComputePass();
-
     computePass.setPipeline(simulationPipeline);
     computePass.setBindGroup(0, bindGroups[step % 2]);
 
     const workgroupCount = Math.ceil(GRID_SIZE / WORKGROUP_SIZE);
     computePass.dispatchWorkgroups(workgroupCount, workgroupCount);
-
     computePass.end();
+
+    // ---- Step 2: Clear the input buffer [(step + 1) % 2]----
+    const clearPass = encoder.beginComputePass();
+    clearPass.setPipeline(clearPipeline);
+    clearPass.setBindGroup(0, bindGroups[(step + 1) % 2]);
+    clearPass.dispatchWorkgroups(workgroupCount, workgroupCount);
+    clearPass.end();
 
     step++; // Increment the step counter
 
+    // ---- Step 3: Render pass for visualization ----
     // Create a render pass
     const pass = encoder.beginRenderPass({
         colorAttachments: [
@@ -37,11 +44,8 @@ function updateGrid() {
     // Draw the grid
     pass.setPipeline(cellPipeline);
     pass.setVertexBuffer(0, vertexBuffer);
-
     pass.setBindGroup(0, bindGroups[step % 2]);
-
     pass.draw(vertices.length / 2, GRID_SIZE * GRID_SIZE); // 6 vertices
-
     pass.end();
 
     // Submit the command buffer to the GPU
@@ -195,6 +199,27 @@ const simulationPipeline = device.createComputePipeline({
     },
 });
 
+// Create a shader module for clearing the grid
+const clearShaderCode = await fetch("clearShader.wgsl").then((response) =>
+    response.text()
+);
+
+// Create a shader module for clearing the grid
+const clearShaderModule = device.createShaderModule({
+    label: "Clear shader",
+    code: clearShaderCode,
+});
+
+// Create a compute pipeline that clears the grid
+const clearPipeline = device.createComputePipeline({
+    label: "Clear pipeline",
+    layout: pipelineLayout,
+    compute: {
+        module: clearShaderModule,
+        entryPoint: "clearMain",
+    },
+});
+
 // Create a uniform buffer that describes the grid.
 // NOTE: A uniform is a value from a buffer
 //      that is the same for every invocation
@@ -231,14 +256,14 @@ const cellStateStorage = [
 // }
 for (let i = 0; i < cellStateArray.length; i++) {
     // cellStateArray[i] = i % 2 ? 0 : 1;
-    // cellStateArray[i] = Math.random() > 0.6 ? 1 : 0;
+    cellStateArray[i] = Math.random() > 0.7 ? 1 : 0;
 }
 // cellStateArray[cellStateArray.length - 9] = 1;
 // cellStateArray[cellStateArray.length - 10] = 1;
 // cellStateArray[cellStateArray.length - 11] = 1;
 // cellStateArray[cellStateArray.length - 105] = 1;
 // cellStateArray[cellStateArray.length - 106] = 1;
-cellStateArray[cellStateArray.length - 202] = 1;
+// cellStateArray[cellStateArray.length - 202] = 1;
 
 // cellStateArray[cellStateArray.length - GRID_SIZE / 2] = 1;
 device.queue.writeBuffer(cellStateStorage[0], 0, cellStateArray);

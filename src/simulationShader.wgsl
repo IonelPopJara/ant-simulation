@@ -24,11 +24,26 @@ fn computeMain(@builtin(global_invocation_id) cell: vec3u) {
     let i = cellIndex(cell.xy);
     let currentCell = cellActive(i32(cell.x), i32(cell.y));
     let belowCell = cellActive(i32(cell.x), i32(cell.y - 1));
+    let belowLeftCell = cellActive(i32(cell.x - 1), i32(cell.y - 1));
+    let belowRightCell = cellActive(i32(cell.x + 1), i32(cell.y - 1));
+    let leftCell = cellActive(i32(cell.x - 1), i32(cell.y));
+    let rightCell = cellActive(i32(cell.x + 1), i32(cell.y));
 
     if (currentCell == 1) {
         if (belowCell == 0) {
             cellStateOut[i] = 0;
             cellStateOut[cellIndex(vec2(cell.x, cell.y - 1))] = 1;
+        }
+        else if (belowLeftCell == 0 && leftCell == 0) {
+            cellStateOut[i] = 0;
+            cellStateOut[cellIndex(vec2(cell.x - 1, cell.y - 1))] = 1;
+        }
+        else if (belowRightCell == 0 && rightCell == 0) {
+            cellStateOut[i] = 0;
+            cellStateOut[cellIndex(vec2(cell.x + 1, cell.y - 1))] = 1;
+        }
+        else {
+            cellStateOut[i] = 1;
         }
     }
 }
