@@ -1,4 +1,4 @@
-const GRID_SIZE = 64;
+const GRID_SIZE = 32;
 const UPDATE_INTERVAL = 50; // Update every 200ms (5 times/sec)
 const WORKGROUP_SIZE = 8;
 let step = 0; // Track how many simulation steps have been run
@@ -9,20 +9,12 @@ function updateGrid() {
     // A command encoder is used to create command buffers,
     // which are used to submit work to the GPU
     const encoder = device.createCommandEncoder();
-    console.log("Updating grid");
-    // for (let i = 0; i < updateCellStateArray.length; i++) {
-    // if (updateCellStateArray[i] === 1) {
-    //     let x = i % GRID_SIZE;
-    //     let y = Math.floor(i / GRID_SIZE);
-    //     console.log(`Cell (${x},${y}) is active`);
-    // }
-    // updateCellStateArray[i] = 0;
-    // }
 
     // ---- Step 1: Compute pass for simulation ----
     const computePass = encoder.beginComputePass();
     // Pass user input
-    device.queue.writeBuffer(mouseCellState, 0, mouseCellStateArray);
+    const mouseState = inputHandler.getUserInputState();
+    device.queue.writeBuffer(mouseCellState, 0, mouseState);
 
     // Clean user input
     for (let i = 0; i < mouseCellStateArray.length; i++) {
@@ -61,6 +53,7 @@ function updateGrid() {
 
     // Draw the grid
     pass.setPipeline(cellPipeline);
+
     pass.setVertexBuffer(0, vertexBuffer);
     pass.setBindGroup(0, bindGroups[step % 2]);
     pass.draw(vertices.length / 2, GRID_SIZE * GRID_SIZE); // 6 vertices
@@ -70,56 +63,13 @@ function updateGrid() {
     device.queue.submit([encoder.finish()]);
 }
 
+import { createInputHandler } from "./userInput.js";
+
 // ----- Canvas definition -----
 const canvas = document.querySelector("canvas");
 
 // ----- Mouse events -----
-let isMouseHeld = false; // Flag to track the mouse button state
-
-canvas.addEventListener("mousedown", (e) => {
-    isMouseHeld = true;
-    mouseMoveHandler(e); // Perform initial action
-});
-
-canvas.addEventListener("mouseup", () => {
-    isMouseHeld = false;
-});
-
-canvas.addEventListener("mouseleave", () => {
-    isMouseHeld = false; // Reset the flag if the mouse leaves the canvas
-});
-
-canvas.addEventListener("mousemove", (e) => {
-    if (isMouseHeld) {
-        mouseMoveHandler(e); // Call the function if the mouse is held
-    }
-});
-
-document.addEventListener("mousedown", mouseMoveHandler, false);
-
-function mouseMoveHandler(e) {
-    const relativeX = e.clientX - canvas.offsetLeft;
-    let relativeY = e.clientY - canvas.offsetTop;
-
-    let withinCanvas =
-        relativeX >= 0 &&
-        relativeX <= canvas.width &&
-        relativeY >= 0 &&
-        relativeY <= canvas.height;
-
-    if (withinCanvas) {
-        const cellY = Math.floor(
-            Math.abs(relativeY - canvas.height) / (canvas.height / GRID_SIZE)
-        );
-
-        const cellX = Math.floor(relativeX / (canvas.width / GRID_SIZE));
-        // console.log(cellX, cellY);
-
-        const index = cellY * GRID_SIZE + cellX;
-        // updateCellStateArray[index] = 1;
-        mouseCellStateArray[index] = 1;
-    }
-}
+const inputHandler = createInputHandler(canvas, GRID_SIZE);
 
 // ----- WebGPU setup -----
 if (!navigator.gpu) {
@@ -227,7 +177,7 @@ const pipelineLayout = device.createPipelineLayout({
     bindGroupLayouts: [bindGroupLayout],
 });
 
-const shaderCode = await fetch("cellShader.wgsl").then((response) =>
+const shaderCode = await fetch("./shaders/cellShader.wgsl").then((response) =>
     response.text()
 );
 
@@ -255,9 +205,9 @@ const cellPipeline = device.createRenderPipeline({
     },
 });
 
-const simulationShaderCode = await fetch("simulationShader.wgsl").then(
-    (response) => response.text()
-);
+const simulationShaderCode = await fetch(
+    "./shaders/simulationShader.wgsl"
+).then((response) => response.text());
 
 const simulationShaderModule = device.createShaderModule({
     label: "Game of Life simulation shader",
@@ -275,8 +225,8 @@ const simulationPipeline = device.createComputePipeline({
 });
 
 // Create a shader module for clearing the grid
-const clearShaderCode = await fetch("clearShader.wgsl").then((response) =>
-    response.text()
+const clearShaderCode = await fetch("./shaders/clearShader.wgsl").then(
+    (response) => response.text()
 );
 
 // Create a shader module for clearing the grid
@@ -347,13 +297,6 @@ const mouseCellState = device.createBuffer({
     size: mouseCellStateArray.byteLength,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
-
-for (let i = 0; i < mouseCellStateArray.length; i++) {
-    if (i % 4 === 0) {
-        // mouseCellStateArray[i] = 1;
-    }
-}
-// device.queue.writeBuffer(mouseCellState, 0, mouseCellStateArray);
 
 // Connect the uniform buffer to the pipeline
 // A bind group is a collection of resources that are bound together
