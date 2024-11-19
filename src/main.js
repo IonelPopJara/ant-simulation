@@ -3,11 +3,21 @@ const UPDATE_INTERVAL = 50; // Update every 200ms (5 times/sec)
 const WORKGROUP_SIZE = 8;
 let step = 0; // Track how many simulation steps have been run
 
+// ----- Main render loop -----
 function updateGrid() {
     // Create a command encoder.
     // A command encoder is used to create command buffers,
     // which are used to submit work to the GPU
     const encoder = device.createCommandEncoder();
+    console.log("Updating grid");
+    for (let i = 0; i < updateCellStateArray.length; i++) {
+        if (updateCellStateArray[i] === 1) {
+            let x = i % GRID_SIZE;
+            let y = Math.floor(i / GRID_SIZE);
+            console.log(`Cell (${x},${y}) is active`);
+        }
+        updateCellStateArray[i] = 0;
+    }
 
     // ---- Step 1: Compute pass for simulation ----
     const computePass = encoder.beginComputePass();
@@ -52,8 +62,57 @@ function updateGrid() {
     device.queue.submit([encoder.finish()]);
 }
 
+// ----- Canvas definition -----
 const canvas = document.querySelector("canvas");
 
+// ----- Mouse events -----
+let isMouseHeld = false; // Flag to track the mouse button state
+
+canvas.addEventListener("mousedown", (e) => {
+    isMouseHeld = true;
+    mouseMoveHandler(e); // Perform initial action
+});
+
+canvas.addEventListener("mouseup", () => {
+    isMouseHeld = false;
+});
+
+canvas.addEventListener("mouseleave", () => {
+    isMouseHeld = false; // Reset the flag if the mouse leaves the canvas
+});
+
+canvas.addEventListener("mousemove", (e) => {
+    if (isMouseHeld) {
+        mouseMoveHandler(e); // Call the function if the mouse is held
+    }
+});
+
+document.addEventListener("mousedown", mouseMoveHandler, false);
+
+function mouseMoveHandler(e) {
+    const relativeX = e.clientX - canvas.offsetLeft;
+    let relativeY = e.clientY - canvas.offsetTop;
+
+    let withinCanvas =
+        relativeX >= 0 &&
+        relativeX <= canvas.width &&
+        relativeY >= 0 &&
+        relativeY <= canvas.height;
+
+    if (withinCanvas) {
+        const cellY = Math.floor(
+            Math.abs(relativeY - canvas.height) / (canvas.height / GRID_SIZE)
+        );
+
+        const cellX = Math.floor(relativeX / (canvas.width / GRID_SIZE));
+        // console.log(cellX, cellY);
+
+        const index = cellY * GRID_SIZE + cellX;
+        updateCellStateArray[index] = 1;
+    }
+}
+
+// ----- WebGPU setup -----
 if (!navigator.gpu) {
     throw new Error("WebGPU is not supported in your browser");
 }
@@ -79,6 +138,7 @@ context.configure({
     format: canvasFormat,
 });
 
+// ---- Create the vertex buffer ----
 // prettier-ignore
 const vertices = new Float32Array([
 // TODO: Learn about index buffers to avoid duplicate vertices
@@ -114,6 +174,7 @@ const vertexBufferLayout = {
     ],
 };
 
+// ---- Create the bind group layout and pipeline layout ----
 // Create the bind group layout and pipeline layout
 const bindGroupLayout = device.createBindGroupLayout({
     label: "Cell Bind Group Layout",
@@ -235,6 +296,8 @@ device.queue.writeBuffer(uniformBuffer, /*bufferOffset=*/ 0, uniformArray);
 // Create an array representing the active state of each cell
 const cellStateArray = new Uint32Array(GRID_SIZE * GRID_SIZE);
 
+const updateCellStateArray = new Uint32Array(GRID_SIZE * GRID_SIZE);
+
 // Create a storage buffer to hold the cell state
 const cellStateStorage = [
     device.createBuffer({
@@ -251,19 +314,9 @@ const cellStateStorage = [
 
 // Set each cell to a random state, then copy the JavaScript array
 // into the storage buffer
-// for (let i = 0; i < cellStateArray.length / 3; i += 3) {
-//     // cellStateArray[i] = Math.random() > 0.6 ? 1 : 0;
-// }
 for (let i = 0; i < cellStateArray.length; i++) {
-    // cellStateArray[i] = i % 2 ? 0 : 1;
-    cellStateArray[i] = Math.random() > 0.7 ? 1 : 0;
+    cellStateArray[i] = Math.random() > 0.8 ? 1 : 0;
 }
-// cellStateArray[cellStateArray.length - 9] = 1;
-// cellStateArray[cellStateArray.length - 10] = 1;
-// cellStateArray[cellStateArray.length - 11] = 1;
-// cellStateArray[cellStateArray.length - 105] = 1;
-// cellStateArray[cellStateArray.length - 106] = 1;
-// cellStateArray[cellStateArray.length - 202] = 1;
 
 // cellStateArray[cellStateArray.length - GRID_SIZE / 2] = 1;
 device.queue.writeBuffer(cellStateStorage[0], 0, cellStateArray);
