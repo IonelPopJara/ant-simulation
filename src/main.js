@@ -10,17 +10,25 @@ function updateGrid() {
     // which are used to submit work to the GPU
     const encoder = device.createCommandEncoder();
     console.log("Updating grid");
-    for (let i = 0; i < updateCellStateArray.length; i++) {
-        if (updateCellStateArray[i] === 1) {
-            let x = i % GRID_SIZE;
-            let y = Math.floor(i / GRID_SIZE);
-            console.log(`Cell (${x},${y}) is active`);
-        }
-        updateCellStateArray[i] = 0;
-    }
+    // for (let i = 0; i < updateCellStateArray.length; i++) {
+    // if (updateCellStateArray[i] === 1) {
+    //     let x = i % GRID_SIZE;
+    //     let y = Math.floor(i / GRID_SIZE);
+    //     console.log(`Cell (${x},${y}) is active`);
+    // }
+    // updateCellStateArray[i] = 0;
+    // }
 
     // ---- Step 1: Compute pass for simulation ----
     const computePass = encoder.beginComputePass();
+    // Pass user input
+    device.queue.writeBuffer(mouseCellState, 0, mouseCellStateArray);
+
+    // Clean user input
+    for (let i = 0; i < mouseCellStateArray.length; i++) {
+        mouseCellStateArray[i] = 0;
+    }
+
     computePass.setPipeline(simulationPipeline);
     computePass.setBindGroup(0, bindGroups[step % 2]);
 
@@ -108,7 +116,8 @@ function mouseMoveHandler(e) {
         // console.log(cellX, cellY);
 
         const index = cellY * GRID_SIZE + cellX;
-        updateCellStateArray[index] = 1;
+        // updateCellStateArray[index] = 1;
+        mouseCellStateArray[index] = 1;
     }
 }
 
@@ -200,6 +209,11 @@ const bindGroupLayout = device.createBindGroupLayout({
             binding: 2,
             visibility: GPUShaderStage.COMPUTE,
             buffer: { type: "storage" }, // Cell state output buffer
+        },
+        {
+            binding: 3,
+            visibility: GPUShaderStage.COMPUTE,
+            buffer: { type: "read-only-storage" }, // Mouse input buffer
         },
     ],
 });
@@ -296,8 +310,6 @@ device.queue.writeBuffer(uniformBuffer, /*bufferOffset=*/ 0, uniformArray);
 // Create an array representing the active state of each cell
 const cellStateArray = new Uint32Array(GRID_SIZE * GRID_SIZE);
 
-const updateCellStateArray = new Uint32Array(GRID_SIZE * GRID_SIZE);
-
 // Create a storage buffer to hold the cell state
 const cellStateStorage = [
     device.createBuffer({
@@ -315,7 +327,7 @@ const cellStateStorage = [
 // Set each cell to a random state, then copy the JavaScript array
 // into the storage buffer
 for (let i = 0; i < cellStateArray.length; i++) {
-    cellStateArray[i] = Math.random() > 0.8 ? 1 : 0;
+    // cellStateArray[i] = Math.random() > 0.8 ? 1 : 0;
 }
 
 // cellStateArray[cellStateArray.length - GRID_SIZE / 2] = 1;
@@ -326,6 +338,22 @@ for (let i = 0; i < cellStateArray.length; i++) {
     cellStateArray[i] = 0;
 }
 device.queue.writeBuffer(cellStateStorage[1], 0, cellStateArray);
+
+// Create a buffer to store the cell state updates from the mouse
+const mouseCellStateArray = new Uint32Array(GRID_SIZE * GRID_SIZE);
+
+const mouseCellState = device.createBuffer({
+    label: "Mouse Cell State",
+    size: mouseCellStateArray.byteLength,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+});
+
+for (let i = 0; i < mouseCellStateArray.length; i++) {
+    if (i % 4 === 0) {
+        // mouseCellStateArray[i] = 1;
+    }
+}
+// device.queue.writeBuffer(mouseCellState, 0, mouseCellStateArray);
 
 // Connect the uniform buffer to the pipeline
 // A bind group is a collection of resources that are bound together
@@ -343,8 +371,12 @@ const bindGroups = [
                 resource: { buffer: cellStateStorage[0] },
             },
             {
-                binding: 2, // New entry
+                binding: 2,
                 resource: { buffer: cellStateStorage[1] },
+            },
+            {
+                binding: 3,
+                resource: { buffer: mouseCellState },
             },
         ],
     }),
@@ -361,8 +393,12 @@ const bindGroups = [
                 resource: { buffer: cellStateStorage[1] },
             },
             {
-                binding: 2, // New entry
+                binding: 2,
                 resource: { buffer: cellStateStorage[0] },
+            },
+            {
+                binding: 3,
+                resource: { buffer: mouseCellState },
             },
         ],
     }),
