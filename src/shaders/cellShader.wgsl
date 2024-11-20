@@ -18,7 +18,12 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
     let i = f32(input.instance);
 
     let cell = vec2f(i % grid.x, floor(i / grid.x));//Updated
-    let state = f32(cellState[input.instance]);
+    var state = f32(cellState[input.instance]);
+
+    // Convert the state to 1 if it's greater than 1
+    if (state >= 1) {
+        state = 1;
+    }
 
     //Compute the cell coordinates from the instance index
     let  cellOffset = (cell / grid) * 2;

@@ -1,10 +1,20 @@
+import { createInputHandler } from "./userInput.js";
+
 const GRID_SIZE = 32;
-const UPDATE_INTERVAL = 50; // Update every 200ms (5 times/sec)
+const UPDATE_INTERVAL = 25; // Update every 25ms
 const WORKGROUP_SIZE = 8;
 let step = 0; // Track how many simulation steps have been run
 
+// ----- Canvas definition -----
+const canvas = document.querySelector("canvas");
+
+// ----- Mouse events -----
+const inputHandler = createInputHandler(canvas, GRID_SIZE);
+
 // ----- Main render loop -----
 function updateGrid() {
+    inputHandler.frameCallback();
+
     // Create a command encoder.
     // A command encoder is used to create command buffers,
     // which are used to submit work to the GPU
@@ -62,14 +72,6 @@ function updateGrid() {
     // Submit the command buffer to the GPU
     device.queue.submit([encoder.finish()]);
 }
-
-import { createInputHandler } from "./userInput.js";
-
-// ----- Canvas definition -----
-const canvas = document.querySelector("canvas");
-
-// ----- Mouse events -----
-const inputHandler = createInputHandler(canvas, GRID_SIZE);
 
 // ----- WebGPU setup -----
 if (!navigator.gpu) {
